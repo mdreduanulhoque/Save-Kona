@@ -25,6 +25,7 @@
             max-height: 100vh;
             overflow: hidden; /* Critical for full screen game */
             text-align: center;
+            font-size: 16px;
         }
 
         .screen {
@@ -121,6 +122,18 @@
             overflow: hidden; 
             background-color: #3d3d3d; 
             display: block; /* Ensure it behaves as a block */
+        }
+        
+        /* Ensure car never overlaps with touch controls on mobile */
+        @media (max-width: 600px), (pointer: coarse) {
+            #game-container {
+                height: 82vh; /* Leave space for touch controls (18vh) */
+                max-height: 82vh;
+            }
+            canvas {
+                height: 82vh !important;
+                max-height: 82vh !important;
+            }
         }
 
         canvas {
@@ -320,6 +333,75 @@
         /* Hide previous summary/result styles */
         .result-summary, .result-title, .result-row, .result-label, .result-value, .final-score-value { display: none !important; }
 
+        @media (max-width: 600px) {
+            body {
+                font-size: 13px;
+            }
+            #start-screen, .message-box {
+                max-width: 98vw;
+                padding: 10px 2vw;
+                margin-top: 8px;
+            }
+            .gameover-graphic-title {
+                font-size: 2em;
+            }
+            .score-block {
+                padding: 8px 8vw 8px 4vw;
+                min-width: 90px;
+            }
+            .score-label, .score-value {
+                font-size: 1em;
+                padding: 2px 6px;
+            }
+            button, .message-box button#restart-button {
+                font-size: 1em;
+                padding: 12px 10vw;
+            }
+            input[type="text"] {
+                font-size: 1em;
+                padding: 10px 2vw;
+                max-width: 90vw;
+            }
+            #score-board {
+                top: 8px;
+                left: 8px;
+                font-size: 1em;
+                padding: 8px 12px;
+            }
+        }
+        /* Touch controls overlay for mobile */
+        #touch-controls {
+            display: none;
+        }
+        @media (pointer: coarse), (max-width: 600px) {
+            #touch-controls {
+                display: flex;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100vw;
+                height: 18vh;
+                z-index: 1001;
+                pointer-events: auto;
+            }
+            .touch-btn {
+                flex: 1;
+                background: rgba(255, 193, 7, 0.18);
+                color: #222;
+                font-size: 2em;
+                border: none;
+                outline: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                user-select: none;
+                -webkit-user-select: none;
+                touch-action: none;
+            }
+            .touch-btn:active {
+                background: rgba(255, 193, 7, 0.35);
+            }
+        }
     </style>
 </head>
 <body>
@@ -348,6 +430,12 @@
             </div>
         </div>
         <button id="restart-button">Try Again</button>
+    </div>
+
+    <!-- Touch controls for mobile -->
+    <div id="touch-controls">
+        <button class="touch-btn" id="touch-left" aria-label="Move Left">&#8592;</button>
+        <button class="touch-btn" id="touch-right" aria-label="Move Right">&#8594;</button>
     </div>
 
     <script>
@@ -434,6 +522,10 @@
                 obstacles.forEach(obstacle => {
                     obstacle.width = canvas.width * OBSTACLE_WIDTH_PERCENT;
                     obstacle.height = canvas.height * OBSTACLE_HEIGHT_PERCENT;
+                    // On mobile, keep obstacles above touch controls
+                    if (isMobileUser && obstacle.y + obstacle.height > canvas.height - window.innerHeight * 0.18) {
+                        obstacle.y = canvas.height - window.innerHeight * 0.18 - obstacle.height;
+                    }
                 });
             }
             return true; 
@@ -638,6 +730,66 @@
             if (!gameRunning || !car) return;
             if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') moveLeftPressed = false;
             else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') moveRightPressed = false;
+        });
+
+        // Touch controls for mobile
+        const touchControls = {
+            left: document.getElementById('touch-left'),
+            right: document.getElementById('touch-right')
+        };
+
+        touchControls.left.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isTouchingLeft = true;
+            isTouchingRight = false;
+        });
+
+        touchControls.left.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isTouchingLeft = false;
+        });
+
+        touchControls.right.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isTouchingRight = true;
+            isTouchingLeft = false;
+        });
+
+        touchControls.right.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isTouchingRight = false;
+        });
+
+        // Touch controls for mobile overlay
+        const touchControlsEl = document.getElementById('touch-controls');
+        const touchLeftBtn = document.getElementById('touch-left');
+        const touchRightBtn = document.getElementById('touch-right');
+
+        function showTouchControls(show) {
+            if (show) {
+                touchControlsEl.style.display = 'flex';
+            } else {
+                touchControlsEl.style.display = 'none';
+            }
+        }
+
+        // Show touch controls only if user is on mobile and game screen is active
+        function updateTouchControlsVisibility() {
+            if (isMobileUser && gameScreen.classList.contains('active')) {
+                touchControlsEl.style.display = 'flex';
+            } else {
+                touchControlsEl.style.display = 'none';
+            }
+        }
+
+        // Ask user for device type on load
+        let isMobileUser = false;
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const ask = confirm('Are you playing on a mobile device? Click OK for Mobile, Cancel for PC.');
+                isMobileUser = ask;
+                updateTouchControlsVisibility();
+            }, 100);
         });
 
         canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
